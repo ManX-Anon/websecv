@@ -1,0 +1,7 @@
+# Optional dependencies for additional features
+# Note: On Windows, these require Microsoft Visual C++ 14.0 or greater
+# Download from: https://visualstudio.microsoft.com/visual-cpp-build-tools/
+
+# PDF report generation (requires C++ build tools)
+weasyprint>=60.0
+
