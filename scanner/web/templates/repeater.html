@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Repeater - WebSecV{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-redo"></i> Repeater</h1>
+</div>
+
+<div class="repeater-container">
+    <div class="request-editor">
+        <h3>Request</h3>
+        <div class="editor-toolbar">
+            <select id="request-method">
+                <option>GET</option>
+                <option>POST</option>
+                <option>PUT</option>
+                <option>DELETE</option>
+            </select>
+            <input type="url" id="request-url" placeholder="https://example.com/api/endpoint">
+            <button class="btn btn-primary" onclick="sendRequest()">Send</button>
+        </div>
+        <div class="editor-tabs">
+            <button class="tab active" onclick="switchTab('raw')">Raw</button>
+            <button class="tab" onclick="switchTab('headers')">Headers</button>
+            <button class="tab" onclick="switchTab('body')">Body</button>
+        </div>
+        <textarea id="request-raw" class="editor-content"></textarea>
+    </div>
+
+    <div class="response-viewer">
+        <h3>Response</h3>
+        <div class="response-info" id="response-info">
+            <span>Status: <span id="response-status">-</span></span>
+            <span>Size: <span id="response-size">-</span></span>
+            <span>Time: <span id="response-time">-</span></span>
+        </div>
+        <div class="editor-tabs">
+            <button class="tab active" onclick="switchResponseTab('body')">Body</button>
+            <button class="tab" onclick="switchResponseTab('headers')">Headers</button>
+        </div>
+        <pre id="response-body" class="editor-content"></pre>
+    </div>
+</div>
+{% endblock %}
+

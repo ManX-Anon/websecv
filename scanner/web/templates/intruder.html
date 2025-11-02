@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Intruder - WebSecV{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-crosshairs"></i> Intruder</h1>
+</div>
+
+<div class="intruder-container">
+    <div class="intruder-config">
+        <h3>Request Configuration</h3>
+        <div class="form-group">
+            <label>Method: <select id="intruder-method"><option>GET</option><option>POST</option></select></label>
+            <label>URL: <input type="url" id="intruder-url" placeholder="https://example.com/api?param=§value§"></label>
+        </div>
+        <h3>Payload Positions</h3>
+        <div id="payload-positions">
+            <div class="position-item">
+                <input type="text" placeholder="Parameter name">
+                <button class="btn btn-sm" onclick="removePosition(this)">Remove</button>
+            </div>
+        </div>
+        <button class="btn btn-sm" onclick="addPosition()">Add Position</button>
+        
+        <h3>Payload Sets</h3>
+        <div id="payload-sets"></div>
+        
+        <button class="btn btn-primary" onclick="startAttack()">Start Attack</button>
+    </div>
+
+    <div class="intruder-results">
+        <h3>Attack Results</h3>
+        <div id="attack-results" class="results-table">
+            <div class="empty">No attack results yet</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

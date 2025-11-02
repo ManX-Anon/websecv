@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Scan Details - WebSecV{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-search"></i> Scan Details</h1>
+</div>
+
+<div class="scan-detail-container">
+    <div id="scan-info" class="scan-info-card">
+        <div class="loading">Loading...</div>
+    </div>
+
+    <div class="scan-vulnerabilities">
+        <h2>Vulnerabilities</h2>
+        <div id="scan-vulns-list">
+            <div class="loading">Loading...</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const scanId = {{ scan_id }};
+    
+    async function loadScanDetails() {
+        try {
+            const [scanRes, vulnsRes] = await Promise.all([
+                fetch(`/api/scans/${scanId}`),
+                fetch(`/api/vulnerabilities?scan_id=${scanId}`)
+            ]);
+            
+            const scan = await scanRes.json();
+            const vulns = await vulnsRes.json();
+            
+            renderScanInfo(scan);
+            renderVulnerabilities(vulns);
+        } catch (error) {
+            console.error('Error loading scan details:', error);
+        }
+    }
+    
+    function renderScanInfo(scan) {
+        const container = document.getElementById('scan-info');
+        container.innerHTML = `
+            <h2>${scan.target_url}</h2>
+            <div class="scan-meta">
+                <p><strong>Status:</strong> <span class="badge badge-${scan.status}">${scan.status}</span></p>
+                <p><strong>Type:</strong> ${scan.scan_type}</p>
+                <p><strong>Started:</strong> ${new Date(scan.started_at).toLocaleString()}</p>
+                ${scan.completed_at ? `<p><strong>Completed:</strong> ${new Date(scan.completed_at).toLocaleString()}</p>` : ''}
+                <p><strong>Vulnerabilities:</strong> ${scan.vulnerability_count || 0}</p>
+            </div>
+        `;
+    }
+    
+    function renderVulnerabilities(vulns) {
+        const container = document.getElementById('scan-vulns-list');
+        if (vulns.length === 0) {
+            container.innerHTML = '<div class="empty">No vulnerabilities found</div>';
+            return;
+        }
+        
+        container.innerHTML = vulns.map(vuln => `
+            <div class="vuln-card vuln-${vuln.severity}">
+                <h3>${vuln.title}</h3>
+                <p>${vuln.description}</p>
+                <div class="vuln-meta">
+                    <span class="badge badge-${vuln.severity}">${vuln.severity}</span>
+                    <span>Confidence: ${(vuln.confidence * 100).toFixed(0)}%</span>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    loadScanDetails();
+</script>
+{% endblock %}
+

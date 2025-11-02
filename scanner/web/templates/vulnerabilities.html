@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Vulnerabilities - WebSecV{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-exclamation-triangle"></i> Vulnerabilities</h1>
+</div>
+
+<div class="vulnerabilities-container">
+    <div class="filters">
+        <input type="text" id="search-input" placeholder="Search vulnerabilities...">
+        <select id="severity-filter">
+            <option value="">All Severities</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+            <option value="info">Info</option>
+        </select>
+        <select id="scan-filter">
+            <option value="">All Scans</option>
+        </select>
+    </div>
+
+    <div id="vulnerabilities-list" class="vuln-grid">
+        <div class="loading">Loading...</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadVulnerabilities() {
+        const severity = document.getElementById('severity-filter').value;
+        const scanId = document.getElementById('scan-filter').value;
+        
+        let url = '/api/vulnerabilities';
+        const params = new URLSearchParams();
+        if (severity) params.append('severity', severity);
+        if (scanId) params.append('scan_id', scanId);
+        if (params.toString()) url += '?' + params.toString();
+        
+        try {
+            const res = await fetch(url);
+            const vulns = await res.json();
+            renderVulnerabilities(vulns);
+        } catch (error) {
+            console.error('Error loading vulnerabilities:', error);
+        }
+    }
+    
+    function renderVulnerabilities(vulns) {
+        const container = document.getElementById('vulnerabilities-list');
+        if (vulns.length === 0) {
+            container.innerHTML = '<div class="empty">No vulnerabilities found</div>';
+            return;
+        }
+        
+        container.innerHTML = vulns.map(vuln => `
+            <div class="vuln-card vuln-${vuln.severity}">
+                <div class="vuln-header">
+                    <h3>${vuln.title}</h3>
+                    <span class="badge badge-${vuln.severity}">${vuln.severity}</span>
+                </div>
+                <p class="vuln-desc">${vuln.description}</p>
+                <div class="vuln-meta">
+                    <span>Confidence: ${(vuln.confidence * 100).toFixed(0)}%</span>
+                    ${vuln.cvss_score ? `<span>CVSS: ${vuln.cvss_score}</span>` : ''}
+                    ${vuln.cwe_id ? `<span>CWE: ${vuln.cwe_id}</span>` : ''}
+                </div>
+                <div class="vuln-actions">
+                    <button class="btn btn-sm" onclick="toggleVerified(${vuln.id})">
+                        <i class="fas fa-check"></i> ${vuln.verified ? 'Verified' : 'Verify'}
+                    </button>
+                    <button class="btn btn-sm" onclick="toggleFalsePositive(${vuln.id})">
+                        <i class="fas fa-times"></i> ${vuln.false_positive ? 'False Positive' : 'Mark FP'}
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    async function toggleVerified(id) {
+        // Toggle verified status
+    }
+    
+    async function toggleFalsePositive(id) {
+        // Toggle false positive status
+    }
+    
+    loadVulnerabilities();
+    document.getElementById('severity-filter').addEventListener('change', loadVulnerabilities);
+</script>
+{% endblock %}
+

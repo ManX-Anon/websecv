@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - WebSecV{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-tachometer-alt"></i> Dashboard</h1>
+        <button class="btn btn-primary" onclick="startNewScan()">
+            <i class="fas fa-plus"></i> New Scan
+        </button>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon critical">
+                <i class="fas fa-exclamation-circle"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="stat-critical">0</h3>
+                <p>Critical</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon high">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="stat-high">0</h3>
+                <p>High</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon medium">
+                <i class="fas fa-info-circle"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="stat-medium">0</h3>
+                <p>Medium</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon low">
+                <i class="fas fa-info"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="stat-low">0</h3>
+                <p>Low</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon scans">
+                <i class="fas fa-search"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="stat-scans">0</h3>
+                <p>Total Scans</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon total">
+                <i class="fas fa-bug"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="stat-total">0</h3>
+                <p>Total Vulnerabilities</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="dashboard-card">
+            <h2><i class="fas fa-list"></i> Recent Scans</h2>
+            <div id="recent-scans" class="scan-list">
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+
+        <div class="dashboard-card">
+            <h2><i class="fas fa-shield-alt"></i> Recent Vulnerabilities</h2>
+            <div id="recent-vulns" class="vuln-list">
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="scan-modal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h2>Start New Scan</h2>
+        <form id="scan-form" onsubmit="submitScan(event)">
+            <div class="form-group">
+                <label for="target-url">Target URL</label>
+                <input type="url" id="target-url" name="target_url" required 
+                       placeholder="https://example.com">
+            </div>
+            <div class="form-group">
+                <label for="scan-type">Scan Type</label>
+                <select id="scan-type" name="scan_type">
+                    <option value="full">Full Scan</option>
+                    <option value="passive">Passive Only</option>
+                    <option value="active">Active Only</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Start Scan</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Load dashboard data
+    async function loadDashboard() {
+        try {
+            // Load stats
+            const statsRes = await fetch('/api/stats');
+            const stats = await statsRes.json();
+            
+            document.getElementById('stat-critical').textContent = stats.by_severity.critical || 0;
+            document.getElementById('stat-high').textContent = stats.by_severity.high || 0;
+            document.getElementById('stat-medium').textContent = stats.by_severity.medium || 0;
+            document.getElementById('stat-low').textContent = stats.by_severity.low || 0;
+            document.getElementById('stat-scans').textContent = stats.total_scans || 0;
+            document.getElementById('stat-total').textContent = stats.total_vulnerabilities || 0;
+            
+            // Load recent scans
+            const scansRes = await fetch('/api/scans?limit=5');
+            const scans = await scansRes.json();
+            renderRecentScans(scans);
+            
+            // Load recent vulnerabilities
+            const vulnsRes = await fetch('/api/vulnerabilities?limit=5');
+            const vulns = await vulnsRes.json();
+            renderRecentVulns(vulns);
+            
+        } catch (error) {
+            console.error('Error loading dashboard:', error);
+        }
+    }
+    
+    function renderRecentScans(scans) {
+        const container = document.getElementById('recent-scans');
+        if (scans.length === 0) {
+            container.innerHTML = '<p class="empty">No scans yet</p>';
+            return;
+        }
+        
+        container.innerHTML = scans.map(scan => `
+            <div class="scan-item">
+                <div class="scan-header">
+                    <span class="scan-url">${scan.target_url}</span>
+                    <span class="badge badge-${scan.status}">${scan.status}</span>
+                </div>
+                <div class="scan-meta">
+                    <span><i class="fas fa-clock"></i> ${new Date(scan.started_at).toLocaleString()}</span>
+                    <span><i class="fas fa-bug"></i> ${scan.vulnerability_count} vulnerabilities</span>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    function renderRecentVulns(vulns) {
+        const container = document.getElementById('recent-vulns');
+        if (vulns.length === 0) {
+            container.innerHTML = '<p class="empty">No vulnerabilities yet</p>';
+            return;
+        }
+        
+        container.innerHTML = vulns.map(vuln => `
+            <div class="vuln-item vuln-${vuln.severity}">
+                <div class="vuln-header">
+                    <span class="vuln-title">${vuln.title}</span>
+                    <span class="badge badge-${vuln.severity}">${vuln.severity}</span>
+                </div>
+                <p class="vuln-desc">${vuln.description.substring(0, 100)}...</p>
+            </div>
+        `).join('');
+    }
+    
+    function startNewScan() {
+        document.getElementById('scan-modal').style.display = 'block';
+    }
+    
+    function closeModal() {
+        document.getElementById('scan-modal').style.display = 'none';
+    }
+    
+    async function submitScan(event) {
+        event.preventDefault();
+        const form = event.target;
+        const formData = new FormData(form);
+        
+        const data = {
+            target_url: formData.get('target_url'),
+            scan_type: formData.get('scan_type')
+        };
+        
+        try {
+            const res = await fetch('/api/scans', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            
+            if (res.ok) {
+                closeModal();
+                loadDashboard();
+                alert('Scan started successfully!');
+            } else {
+                alert('Error starting scan');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error starting scan');
+        }
+    }
+    
+    // Load dashboard on page load
+    loadDashboard();
+    
+    // Refresh every 5 seconds
+    setInterval(loadDashboard, 5000);
+</script>
+{% endblock %}
+

@@ -119,6 +119,20 @@ def report(ctx, format, output):
     click.echo(f"Report saved: {report_path}")
 
 
+@cli.command()
+@click.option('--host', default='127.0.0.1', help='Host to bind to')
+@click.option('--port', default=5000, type=int, help='Port to bind to')
+@click.option('--debug', is_flag=True, help='Enable debug mode')
+@click.pass_context
+def web(ctx, host, port, debug):
+    """Start the web application"""
+    from scanner.web.app import create_app
+    
+    app = create_app()
+    click.echo(f"Starting web application on http://{host}:{port}")
+    app.run(host=host, port=port, debug=debug)
+
+
 if __name__ == '__main__':
     cli()
 

@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Scans - WebSecV{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-search"></i> Scans</h1>
+    <button class="btn btn-primary" onclick="startNewScan()">
+        <i class="fas fa-plus"></i> New Scan
+    </button>
+</div>
+
+<div class="scans-container">
+    <div class="filters">
+        <input type="text" id="search-input" placeholder="Search scans..." onkeyup="filterScans()">
+        <select id="status-filter" onchange="filterScans()">
+            <option value="">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="running">Running</option>
+            <option value="completed">Completed</option>
+            <option value="failed">Failed</option>
+        </select>
+    </div>
+
+    <div id="scans-table" class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Target URL</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Started</th>
+                    <th>Completed</th>
+                    <th>Vulnerabilities</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="scans-tbody">
+                <tr><td colspan="8" class="loading">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="scan-modal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h2>Start New Scan</h2>
+        <form id="scan-form" onsubmit="submitScan(event)">
+            <div class="form-group">
+                <label for="target-url">Target URL</label>
+                <input type="url" id="target-url" name="target_url" required>
+            </div>
+            <div class="form-group">
+                <label for="scan-type">Scan Type</label>
+                <select id="scan-type" name="scan_type">
+                    <option value="full">Full Scan</option>
+                    <option value="passive">Passive Only</option>
+                    <option value="active">Active Only</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Start Scan</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadScans() {
+        try {
+            const res = await fetch('/api/scans');
+            const scans = await res.json();
+            renderScans(scans);
+        } catch (error) {
+            console.error('Error loading scans:', error);
+        }
+    }
+    
+    function renderScans(scans) {
+        const tbody = document.getElementById('scans-tbody');
+        if (scans.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="empty">No scans found</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = scans.map(scan => `
+            <tr>
+                <td>${scan.id}</td>
+                <td><a href="/scan/${scan.id}">${scan.target_url}</a></td>
+                <td>${scan.scan_type}</td>
+                <td><span class="badge badge-${scan.status}">${scan.status}</span></td>
+                <td>${new Date(scan.started_at).toLocaleString()}</td>
+                <td>${scan.completed_at ? new Date(scan.completed_at).toLocaleString() : '-'}</td>
+                <td>${scan.vulnerability_count || 0}</td>
+                <td>
+                    <button class="btn btn-sm" onclick="deleteScan(${scan.id})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+    
+    async function deleteScan(id) {
+        if (!confirm('Are you sure you want to delete this scan?')) return;
+        
+        try {
+            const res = await fetch(`/api/scans/${id}`, {method: 'DELETE'});
+            if (res.ok) {
+                loadScans();
+            }
+        } catch (error) {
+            console.error('Error deleting scan:', error);
+        }
+    }
+    
+    function filterScans() {
+        // Simple client-side filtering
+        loadScans();
+    }
+    
+    function startNewScan() {
+        document.getElementById('scan-modal').style.display = 'block';
+    }
+    
+    function closeModal() {
+        document.getElementById('scan-modal').style.display = 'none';
+    }
+    
+    async function submitScan(event) {
+        event.preventDefault();
+        const form = event.target;
+        const formData = new FormData(form);
+        
+        const data = {
+            target_url: formData.get('target_url'),
+            scan_type: formData.get('scan_type')
+        };
+        
+        try {
+            const res = await fetch('/api/scans', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            
+            if (res.ok) {
+                closeModal();
+                loadScans();
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    }
+    
+    loadScans();
+    setInterval(loadScans, 10000); // Refresh every 10 seconds
+</script>
+{% endblock %}
+
