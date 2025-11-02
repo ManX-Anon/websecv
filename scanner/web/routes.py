@@ -7,7 +7,13 @@ from scanner.database.models import db, Scan, Vulnerability, Request, Response, 
 from scanner.scanner.engine import ScanEngine
 from scanner.crawler.spider import WebSpider
 from scanner.core.config import Config
+from scanner.profiles.manager import ProfileManager
+from scanner.reporting.generator import ReportGenerator
+from scanner.analysis.analyzer import VulnerabilityAnalyzer
+from scanner.analysis.chainer import VulnerabilityChainer
+from scanner.analysis.impact import ImpactAnalyzer
 from datetime import datetime
+from pathlib import Path
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -48,9 +54,21 @@ def create_scan():
         scan.status = 'running'
         db.session.commit()
         
-        # Run scan
+        # Run scan with profile
         config = Config()
-        engine = ScanEngine(config.scanner)
+        
+        # Use profile if specified
+        profile_name = data.get('profile', 'full')
+        from scanner.profiles.manager import ProfileManager
+        profile_manager = ProfileManager()
+        profile = profile_manager.get_profile(profile_name)
+        
+        if profile:
+            scanner_config = profile.get_scanner_config()
+        else:
+            scanner_config = config.scanner
+        
+        engine = ScanEngine(scanner_config)
         
         # Actually run the scan (now implemented)
         vulnerabilities_list = engine.scan(target_url)
@@ -181,6 +199,106 @@ def start_crawl():
         return jsonify(results), 200
     except Exception as e:
         logger.error(f"Crawl error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# Profiles
+@api_bp.route('/profiles', methods=['GET'])
+def get_profiles():
+    """Get available scan profiles"""
+    manager = ProfileManager()
+    profiles = []
+    for name in manager.list_profiles():
+        profile = manager.get_profile(name)
+        profiles.append({
+            'name': profile.name,
+            'description': profile.description,
+        })
+    return jsonify(profiles)
+
+
+# Analysis endpoints
+@api_bp.route('/analysis/<int:scan_id>', methods=['GET'])
+def analyze_scan(scan_id):
+    """Analyze scan vulnerabilities"""
+    scan = Scan.query.get_or_404(scan_id)
+    vulnerabilities = Vulnerability.query.filter_by(scan_id=scan_id).all()
+    
+    # Convert to Vulnerability objects (simplified)
+    vuln_list = []
+    for v in vulnerabilities:
+        from scanner.core.interfaces import Vulnerability as Vuln, Severity, HttpRequest, HttpMethod, HttpResponse
+        vuln_list.append(Vuln(
+            title=v.title,
+            description=v.description,
+            severity=Severity(v.severity),
+            confidence=v.confidence,
+            request=None,  # Would need to load from Request table
+            response=None,  # Would need to load from Response table
+            evidence=v.evidence,
+            remediation=v.remediation,
+            cwe_id=v.cwe_id,
+            cvss_score=v.cvss_score,
+        ))
+    
+    analyzer = VulnerabilityAnalyzer()
+    chainer = VulnerabilityChainer()
+    impact_analyzer = ImpactAnalyzer()
+    
+    analysis = analyzer.analyze(vuln_list)
+    chains = chainer.analyze_chains(vuln_list)
+    impact = impact_analyzer.analyze_impact(vuln_list, scan.target_url)
+    
+    return jsonify({
+        'analysis': analysis,
+        'chains': chains,
+        'impact': impact,
+    })
+
+
+# Report generation
+@api_bp.route('/scans/<int:scan_id>/report', methods=['POST'])
+def generate_report(scan_id):
+    """Generate report for scan"""
+    scan = Scan.query.get_or_404(scan_id)
+    data = request.json or {}
+    format_type = data.get('format', 'html')
+    
+    vulnerabilities = Vulnerability.query.filter_by(scan_id=scan_id).all()
+    
+    # Convert to Vulnerability objects (simplified)
+    vuln_list = []
+    for v in vulnerabilities:
+        from scanner.core.interfaces import Vulnerability as Vuln, Severity, HttpRequest, HttpMethod, HttpResponse
+        vuln_list.append(Vuln(
+            title=v.title,
+            description=v.description,
+            severity=Severity(v.severity),
+            confidence=v.confidence,
+            request=None,
+            response=None,
+            evidence=v.evidence,
+            remediation=v.remediation,
+            cwe_id=v.cwe_id,
+            cvss_score=v.cvss_score,
+        ))
+    
+    generator = ReportGenerator()
+    output_path = Path(f"reports/scan_{scan_id}_report.{format_type}")
+    
+    try:
+        report_path = generator.generate(
+            vuln_list,
+            output_path,
+            format=format_type,
+            target=scan.target_url
+        )
+        return jsonify({
+            'status': 'success',
+            'path': str(report_path),
+        }), 200
+    except Exception as e:
+        logger.error(f"Report generation error: {e}")
         return jsonify({'error': str(e)}), 500
 
 

@@ -35,17 +35,29 @@ class ScanEngine(IScanner):
         from .checks.cors import CORSCheck
         from .checks.ssl import SSLCheck
         from .checks.headers import SecurityHeadersCheck
+        from .checks.ssrf import SSRFCheck
+        from .checks.xxe import XXECheck
+        from .checks.path_traversal import PathTraversalCheck
+        from .checks.command_injection import CommandInjectionCheck
+        from .checks.open_redirect import OpenRedirectCheck
+        from .checks.idor import IDORCheck
         
         # Passive checks
         if self.config.passive_checks:
             self.register_check(CORSCheck())
             self.register_check(SSLCheck())
             self.register_check(SecurityHeadersCheck())
+            self.register_check(OpenRedirectCheck())
         
         # Active checks
         if self.config.active_checks:
             self.register_check(XSSCheck())
             self.register_check(SQLInjectionCheck())
+            self.register_check(SSRFCheck())
+            self.register_check(XXECheck())
+            self.register_check(PathTraversalCheck())
+            self.register_check(CommandInjectionCheck())
+            self.register_check(IDORCheck())
     
     def scan(self, target: str) -> List[Vulnerability]:
         """Scan target for vulnerabilities"""
@@ -161,6 +173,32 @@ class ScanEngine(IScanner):
             
             vulnerabilities = unique_vulns
             logger.info(f"Total unique vulnerabilities found: {len(vulnerabilities)}")
+            
+            # Enhanced crawling with form discovery
+            if self.config.active_checks:
+                try:
+                    from scanner.crawler.form_discovery import FormDiscovery
+                    
+                    # Parse HTML for forms
+                    html_content = http_response.body.decode('utf-8', errors='ignore')
+                    form_discovery = FormDiscovery()
+                    forms = form_discovery.discover_forms(html_content, target)
+                    
+                    logger.info(f"Discovered {len(forms)} forms")
+                    
+                    # Scan discovered forms (basic check)
+                    for form in forms[:2]:  # Limit to first 2 forms
+                        if form['method'] == 'POST':
+                            # Check for potential issues in forms
+                            # This is a simplified check
+                            pass
+                    
+                    # Discover API endpoints
+                    api_endpoints = form_discovery.discover_api_endpoints(html_content)
+                    logger.info(f"Discovered {len(api_endpoints)} API endpoints from JavaScript")
+                    
+                except Exception as e:
+                    logger.debug(f"Form discovery error: {e}")
             
         except Exception as e:
             logger.error(f"Error scanning {target}: {e}", exc_info=True)

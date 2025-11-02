@@ -9,6 +9,9 @@ from datetime import datetime
 
 from scanner.core.interfaces import Vulnerability, Severity
 from .formats import HTMLReportGenerator, PDFReportGenerator, JSONReportGenerator
+from .csv import CSVReportGenerator
+from .xml import XMLReportGenerator
+from .sarif import SARIFGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +24,9 @@ class ReportGenerator:
             'html': HTMLReportGenerator(),
             'pdf': PDFReportGenerator(),
             'json': JSONReportGenerator(),
+            'csv': CSVReportGenerator(),
+            'xml': XMLReportGenerator(),
+            'sarif': SARIFGenerator(),
         }
     
     def generate(
@@ -36,7 +42,17 @@ class ReportGenerator:
             raise ValueError(f"Unsupported format: {format}")
         
         generator = self.generators[format]
-        return generator.generate(vulnerabilities, output_path, target, metadata)
+        
+        # Special handling for SARIF
+        if format == 'sarif':
+            sarif_data = generator.generate(vulnerabilities, target)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            import json
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(sarif_data, f, indent=2)
+            return output_path
+        else:
+            return generator.generate(vulnerabilities, output_path, target, metadata)
     
     def generate_executive_summary(self, vulnerabilities: List[Vulnerability]) -> Dict[str, Any]:
         """Generate executive summary"""

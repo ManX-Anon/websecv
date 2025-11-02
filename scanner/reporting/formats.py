@@ -173,8 +173,17 @@ class JSONReportGenerator:
             'target': target,
             'generated': datetime.now().isoformat(),
             'metadata': metadata or {},
+            'summary': {
+                'total': len(vulnerabilities),
+                'by_severity': {}
+            },
             'vulnerabilities': []
         }
+        
+        # Calculate summary
+        for vuln in vulnerabilities:
+            severity = vuln.severity.value
+            report['summary']['by_severity'][severity] = report['summary']['by_severity'].get(severity, 0) + 1
         
         for vuln in vulnerabilities:
             report['vulnerabilities'].append({
