@@ -51,11 +51,120 @@ class ScanEngine(IScanner):
         """Scan target for vulnerabilities"""
         logger.info(f"Starting scan of {target}")
         
-        # For now, scan requires HTTP requests
-        # In production, this would integrate with crawler/proxy
         vulnerabilities = []
         
-        # Placeholder - actual implementation would fetch and check requests
+        # Make HTTP request to target
+        try:
+            import requests
+            from urllib.parse import urlparse
+            from scanner.core.interfaces import HttpRequest, HttpResponse, HttpMethod
+            
+            # Parse target URL
+            parsed = urlparse(target)
+            if not parsed.scheme:
+                target = 'https://' + target
+                parsed = urlparse(target)
+            
+            logger.info(f"Scanning {target}")
+            
+            # Make initial request
+            headers = {
+                'User-Agent': 'Scanner/1.0'
+            }
+            
+            try:
+                response = requests.get(target, headers=headers, timeout=30, allow_redirects=True)
+            except requests.exceptions.SSLError:
+                # Try HTTP if HTTPS fails
+                target = target.replace('https://', 'http://')
+                response = requests.get(target, headers=headers, timeout=30, allow_redirects=True)
+            
+            # Create HttpRequest object
+            request = HttpRequest(
+                method=HttpMethod.GET,
+                url=target,
+                headers=headers,
+                body=None
+            )
+            
+            # Create HttpResponse object
+            http_response = HttpResponse(
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                body=response.content,
+            )
+            
+            # Scan the request/response pair
+            found_vulns = self.scan_request_response(request, http_response)
+            vulnerabilities.extend(found_vulns)
+            
+            logger.info(f"Found {len(found_vulns)} vulnerabilities from initial request")
+            
+            # Try to discover additional endpoints and scan them
+            # Check for common paths and API endpoints
+            common_paths = [
+                '/api', '/api/users', '/api/login', '/api/data',
+                '/admin', '/login', '/signup', '/register',
+                '/search', '/profile', '/user', '/test'
+            ]
+            
+            parsed = urlparse(target)
+            base_url = f"{parsed.scheme}://{parsed.netloc}"
+            
+            # Track seen vulnerabilities to avoid duplicates
+            seen_vulns = set()
+            
+            # Scan a few common paths
+            for path in common_paths[:5]:  # Scan more paths
+                try:
+                    test_url = base_url + path
+                    test_response = requests.get(test_url, headers=headers, timeout=10, allow_redirects=False)
+                    
+                    # Only scan if endpoint exists (status 200-399)
+                    if test_response.status_code >= 400:
+                        continue
+                    
+                    test_request = HttpRequest(
+                        method=HttpMethod.GET,
+                        url=test_url,
+                        headers=headers,
+                        body=None
+                    )
+                    
+                    test_http_response = HttpResponse(
+                        status_code=test_response.status_code,
+                        headers=dict(test_response.headers),
+                        body=test_response.content,
+                    )
+                    
+                    # Scan this endpoint
+                    path_vulns = self.scan_request_response(test_request, test_http_response)
+                    for vuln in path_vulns:
+                        # Deduplicate: same title + URL combination
+                        vuln_key = (vuln.title, test_url)
+                        if vuln_key not in seen_vulns:
+                            seen_vulns.add(vuln_key)
+                            vulnerabilities.append(vuln)
+                    
+                except Exception as e:
+                    logger.debug(f"Error scanning {path}: {e}")
+                    continue
+            
+            # Deduplicate final list
+            unique_vulns = []
+            seen = set()
+            for vuln in vulnerabilities:
+                key = (vuln.title, vuln.request.url)
+                if key not in seen:
+                    seen.add(key)
+                    unique_vulns.append(vuln)
+            
+            vulnerabilities = unique_vulns
+            logger.info(f"Total unique vulnerabilities found: {len(vulnerabilities)}")
+            
+        except Exception as e:
+            logger.error(f"Error scanning {target}: {e}", exc_info=True)
+        
         return vulnerabilities
     
     def scan_request_response(self, request: HttpRequest, response: HttpResponse) -> List[Vulnerability]:

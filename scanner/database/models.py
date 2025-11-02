@@ -175,7 +175,7 @@ class ScanHistory(db.Model):
     
     action = Column(String(100), nullable=False)  # started, completed, error, etc.
     message = Column(Text, nullable=True)
-    metadata = Column(JSON, nullable=True)
+    meta_data = Column(JSON, nullable=True)  # Renamed from 'metadata' (reserved in SQLAlchemy)
     
     timestamp = Column(DateTime, default=datetime.utcnow)
     
@@ -188,7 +188,7 @@ class ScanHistory(db.Model):
             'scan_id': self.scan_id,
             'action': self.action,
             'message': self.message,
-            'metadata': self.metadata,
+            'metadata': self.meta_data,  # Return as 'metadata' for API compatibility
             'timestamp': self.timestamp.isoformat() if self.timestamp else None,
         }
 

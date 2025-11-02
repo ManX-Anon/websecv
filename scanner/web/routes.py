@@ -10,6 +10,7 @@ from scanner.core.config import Config
 from datetime import datetime
 import logging
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 api_bp = Blueprint('api', __name__)
@@ -51,8 +52,10 @@ def create_scan():
         config = Config()
         engine = ScanEngine(config.scanner)
         
-        # For now, this is simplified - in production, use background tasks
+        # Actually run the scan (now implemented)
         vulnerabilities_list = engine.scan(target_url)
+        
+        logger.info(f"Scan completed: Found {len(vulnerabilities_list)} vulnerabilities")
         
         # Save vulnerabilities
         for vuln in vulnerabilities_list:
@@ -73,8 +76,10 @@ def create_scan():
         scan.completed_at = datetime.utcnow()
         db.session.commit()
         
+        logger.info(f"Scan {scan.id} completed successfully with {len(vulnerabilities_list)} vulnerabilities")
+        
     except Exception as e:
-        logger.error(f"Scan error: {e}")
+        logger.error(f"Scan error: {e}", exc_info=True)
         scan.status = 'failed'
         db.session.commit()
     
