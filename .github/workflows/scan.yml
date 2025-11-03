@@ -12,39 +12,41 @@ on:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-    
-    - name: Install dependencies
-      run: |
-        pip install -r requirements.txt
-    
-    - name: Run security scan
-      run: |
-        python -m scanner.cli scan https://example.com --format json --output scan_results.json
-    
-    - name: Upload scan results
-      uses: actions/upload-artifact@v3
-      if: always()
-      with:
-        name: scan-results
-        path: scan_results.json
-    
-    - name: Check for critical vulnerabilities
-      run: |
-        python -c "
-        import json
-        with open('scan_results.json') as f:
-            data = json.load(f)
-        critical = [v for v in data['vulnerabilities'] if v['severity'] == 'critical']
-        if critical:
-            print(f'Found {len(critical)} critical vulnerabilities!')
-            exit(1)
-        "
 
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run security scan
+        run: |
+          python -m scanner.cli scan https://example.com --format json --output scan_results.json
+
+      - name: Upload scan results
+        uses: actions/upload-artifact@v4   # ✅ updated to v4
+        if: always()
+        with:
+          name: scan-results
+          path: scan_results.json
+
+      - name: Check for critical vulnerabilities
+        run: |
+          python -c "
+          import json
+          with open('scan_results.json') as f:
+              data = json.load(f)
+          critical = [v for v in data.get('vulnerabilities', []) if v.get('severity') == 'critical']
+          if critical:
+              print(f'Found {len(critical)} critical vulnerabilities!')
+              exit(1)
+          else:
+              print('No critical vulnerabilities found ✅')
+          "
