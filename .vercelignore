@@ -1,0 +1,7 @@
+tests/
+test/
+docs/
+__pycache__/
+*.log
+*.md
+requirements-optional.txt
